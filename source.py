@@ -112,8 +112,6 @@ def check_event_logs():
     
     try:
         print(f"  {Colors.BLUE}[i] Checking event logs...{Colors.RESET}")
-        
-        # Create temporary PowerShell script for event checking
         ps_script = '''
         $ErrorActionPreference = 'SilentlyContinue'
         
@@ -137,26 +135,18 @@ def check_event_logs():
         Get-LastEvent -LogName "Security" -EventID 1102
         Get-LastEvent -LogName "Security" -EventID 104
         '''
-        
-        # Create temporary file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False, encoding='utf-8') as f:
             f.write(ps_script)
             temp_file = f.name
-        
         try:
-            # Run PowerShell
             cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", temp_file]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, shell=True)
-            
-            # Parse results
             results = {}
             if result.returncode == 0:
                 for line in result.stdout.strip().split('\n'):
                     if '=' in line:
                         key, value = line.split('=', 1)
                         results[key] = value
-            
-            # Display results
             if "Application-3079" in results:
                 if results["Application-3079"] != "NOT_FOUND":
                     print_status("[!] Event 3079 (USN Journal)", f"{results['Application-3079']}", "WARNING")
@@ -182,7 +172,6 @@ def check_event_logs():
                 print_status("[+] Event 104 (Audit Disabled)", "Not found")
                 
         finally:
-            # Delete temporary file
             try:
                 os.unlink(temp_file)
             except:
@@ -577,7 +566,6 @@ def check_system_access():
     print_section_header("SYSTEM UTILITIES ACCESS")
     
     try:
-        # Task Manager check
         try:
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
@@ -594,8 +582,6 @@ def check_system_access():
             print_status("[+] Task Manager", "Available")
         except Exception:
             print_status("[+] Task Manager", "Available")
-        
-        # gpedit check
         try:
             gpedit_path = r"C:\Windows\System32\gpedit.msc"
             if os.path.exists(gpedit_path):
@@ -604,8 +590,6 @@ def check_system_access():
                 print_status("[!] Group Policy Editor", "Not found (possibly Windows Home)", "WARNING")
         except:
             print_status("[+] Group Policy Editor", "Available")
-        
-        # Registry Editor check
         try:
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
@@ -622,8 +606,6 @@ def check_system_access():
             print_status("[+] Registry Editor", "Available")
         except Exception:
             print_status("[+] Registry Editor", "Available")
-        
-        # Command Prompt check
         try:
             key_path = r"Software\Policies\Microsoft\Windows\System"
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
@@ -786,7 +768,6 @@ def check_running_scripts():
                 cmdline = process_info.get('cmdline')
                 
                 if cmdline:
-                    # Check for BAT files
                     for arg in cmdline:
                         if isinstance(arg, str) and arg.lower().endswith('.bat'):
                             create_time = datetime.fromtimestamp(process_info['create_time'])
@@ -798,8 +779,6 @@ def check_running_scripts():
                                 'path': arg
                             })
                             break
-                    
-                    # Check for Python files
                     for arg in cmdline:
                         if isinstance(arg, str) and arg.lower().endswith('.py'):
                             create_time = datetime.fromtimestamp(process_info['create_time'])
@@ -811,13 +790,10 @@ def check_running_scripts():
                                 'path': arg
                             })
                             break
-                    
-                    # Check for Python processes running scripts
                     process_name = process_info['name'].lower()
                     if 'python' in process_name or 'python3' in process_name or 'python.exe' in process_name:
                         for arg in cmdline:
                             if isinstance(arg, str) and (arg.lower().endswith('.py') or not arg.endswith('.exe')):
-                                # Skip the python.exe itself
                                 if not arg.lower().endswith('.exe'):
                                     create_time = datetime.fromtimestamp(process_info['create_time'])
                                     py_processes.append({
@@ -833,8 +809,6 @@ def check_running_scripts():
                 continue
             except Exception:
                 continue
-        
-        # Display BAT scripts results
         if bat_processes:
             print_status(f"[!] BAT scripts running", f"{len(bat_processes)} found", "WARNING")
             
@@ -849,8 +823,6 @@ def check_running_scripts():
                     print_status(f"       Command", f"{proc['cmdline']}", "WARNING", 2)
         else:
             print_status("[+] BAT scripts", "No running BAT scripts found")
-        
-        # Display PY scripts results
         if py_processes:
             print_status(f"[!] Python scripts running", f"{len(py_processes)} found", "WARNING")
             
@@ -865,8 +837,6 @@ def check_running_scripts():
                     print_status(f"       Command", f"{proc['cmdline']}", "WARNING", 2)
         else:
             print_status("[+] Python scripts", "No running Python scripts found")
-        
-        # Check for suspicious script locations
         suspicious_paths = [
             r"C:\Windows\Temp",
             r"C:\Windows\System32",
@@ -902,7 +872,6 @@ def check_running_scripts():
             for proc in suspicious_py:
                 print_status(f"  [!] {os.path.basename(proc['path'])}", f"Location: {proc['path']}", "ERROR", 1)
         
-        # Check for cmd.exe processes (could be running scripts)
         cmd_processes = []
         for proc in psutil.process_iter(['pid', 'name', 'create_time']):
             try:
@@ -917,7 +886,7 @@ def check_running_scripts():
         
         if cmd_processes:
             print_status(f"[i] CMD.exe processes", f"{len(cmd_processes)} running", "INFO")
-            for proc in cmd_processes[:3]:  # Show only first 3
+            for proc in cmd_processes[:3]:  
                 print_status(f"  [i] CMD.exe (PID: {proc['pid']})", f"Started: {proc['started'].strftime('%H:%M:%S')}", "INFO", 1)
             
     except Exception as e:
@@ -974,7 +943,6 @@ def cleaning_detection():
 
 def main():
     try:
-        # Check for admin rights
         if not ctypes.windll.shell32.IsUserAnAdmin():
             print(f"{Colors.RED}[!] Please run as administrator!{Colors.RESET}")
             input("Press Enter to exit...")
@@ -1010,3 +978,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
